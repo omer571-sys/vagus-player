@@ -8,6 +8,10 @@ import time
 from tinytag import TinyTag
 from pypresence import Presence
 
+"""
+Bu yazılımın tüm hakları GPLv3 lisansı altında korunmaktadır.
+"""
+
 CLIENTID = "DISCORD PRESENCE ID"
 
 class Window(QWidget):
@@ -18,7 +22,7 @@ class Window(QWidget):
     def setupUI(self):
         self.setFullUI()
         self.openMP3File()
-        #self.setRPC()
+        self.setRPC()
         self.show()
 
     def openMP3File(self):
