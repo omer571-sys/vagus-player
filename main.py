@@ -1,18 +1,19 @@
-import sys
-import PyQt5
-from PyQt5.QtCore import *
-from PyQt5.QtWidgets import *
-from PyQt5.QtMultimedia import *
-from PyQt5.QtGui import *
-import time
+from sys import argv, exit
+from PyQt5.QtCore import Qt, QUrl
+from PyQt5.QtWidgets import (QWidget, QApplication, QAction, QMenuBar,
+    QLabel, QPushButton, QSlider, QVBoxLayout, QHBoxLayout)
+from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent, QMediaPlaylist
+from time import time
 from tinytag import TinyTag
 from pypresence import Presence
+from os import listdir
 
 """
 Bu yazılımın tüm hakları GPLv3 lisansı altında korunmaktadır.
 """
 
-CLIENTID = "DISCORD PRESENCE ID"
+PLAYLIST_KLASORU = ""
+CLIENTID = "DISCORD RICH PRESENCE ID"
 
 class Window(QWidget):
     def __init__(self):
@@ -20,29 +21,51 @@ class Window(QWidget):
         self.setupUI()
 
     def setupUI(self):
+        self.playlistarr = listdir(PLAYLIST_KLASORU)
         self.setFullUI()
-        self.openMP3File()
-        self.setRPC()
         self.show()
+        try:
+            self.setRPC()
+        except:
+            pass
+        self.openMP3File()
 
     def openMP3File(self):
-        fullpath, _ = QFileDialog.getOpenFileName(self,"Vagus Player MP3 Dosya Aç", "","MP3 Dosyaları (*.mp3)")
-        if(fullpath == ''):
-            pass
-        media = QUrl.fromLocalFile(fullpath)
-        content = QMediaContent(media)
         self.player = QMediaPlayer()
-        self.player.setMedia(content)
+        self.playlist = QMediaPlaylist(self.player)
+        for i in self.playlistarr:
+            self.playlist.addMedia(QMediaContent(QUrl.fromLocalFile(PLAYLIST_KLASORU+"/"+i)))
+        self.playlist.setCurrentIndex(0)
+        self.playlist.setPlaybackMode(3)
+        self.player.setPlaylist(self.playlist)
         self.player.play()
+        self.buSarki = time()
+        self.acik = True
+        self.filename = self.playlistarr[self.playlist.currentIndex()][0:-4]
+        try:
+            self.updateRPC()
+        except:
+            pass
+        self.label1.setText(self.playlistarr[self.playlist.currentIndex()])
         self.player.positionChanged.connect(self.playerValueChanged)
         self.slider.valueChanged.connect(self.sliderValueChanged)
-        tag = TinyTag.get(fullpath)
+        self.playlist.currentIndexChanged.connect(self.playlistcurrindchanged)
+        tag = TinyTag.get(PLAYLIST_KLASORU+"/"+self.playlistarr[self.playlist.currentIndex()])
         self.slider.setMaximum(int(self.intToMil(tag.duration)))
+
+    def playlistcurrindchanged(self):
+        print("değişti")
+        self.filename = self.playlistarr[self.playlist.currentIndex()][0:-4]
+        tag = TinyTag.get(PLAYLIST_KLASORU+"/"+self.playlistarr[self.playlist.currentIndex()])
+        self.label1.setText(self.filename)
+        self.buSarki = time()
+        self.slider.setMaximum(int(self.intToMil(tag.duration)))
+        self.updateRPC()
 
     def setFullUI(self):
         self.setWindowTitle("Vagus Player v0.1")
         self.setMenuBars()
-        self.label1 = QLabel("<h2>Vagus Player</h2>")
+        self.label1 = QLabel("")
         self.label2 = QLabel("0:0:0")
         self.label1.setAlignment(Qt.AlignCenter)
         self.button1 = QPushButton("Durdur")
@@ -84,10 +107,17 @@ class Window(QWidget):
         self.openMP3File()
 
     def setRPC(self):
-        RPC = Presence(CLIENTID)
-        RPC.connect()
+        self.RPC = Presence(CLIENTID)
+        self.RPC.connect()
 
-        RPC.update(state=f"{self.filename} dinliyor", start=time.time()*1000)
+        self.RPC.update(large_image="logom", large_text="Vagus Player", state=f"Boşta", start=time()*1000)
+
+
+    def updateRPC(self):
+        if self.acik == True:
+            self.RPC.update(large_image="logom", large_text="Vagus Player", small_image="ba_lat", small_text="Dinliyor", state=f"{self.filename} dinliyor", start=self.buSarki*1000)
+        else:
+            self.RPC.update(large_image="logom", large_text="Vagus Player", small_image="durdur", small_text="Durdu", state=f"{self.filename} dinliyor", start=self.buSarki*1000)
 
     def milis(self, syi):
         millis = int(syi)
@@ -105,14 +135,13 @@ class Window(QWidget):
         min2, sec2 = self.milis(self.slider.maximum())
         self.label2.setText(f"{min}:{sec}/{min2}:{sec2}")
         self.slider.setValue(self.player.position())
-        if min == min2 and sec == sec2:
+        """if min == min2 and sec == sec2:
             filename = 'test.mp3'
             fullpath = QDir.current().absoluteFilePath(filename)
             media = QUrl.fromLocalFile(fullpath)
             content = QMediaContent(media)
             self.player.setMedia(content)
-            self.player.pause()
-            self.player.play()
+            self.player.play()"""
 
     def sliderValueChanged(self):
         if self.slider.value() == self.intToMil(self.player.position()) / 1000:
@@ -124,9 +153,13 @@ class Window(QWidget):
         if self.button1.text() == "Durdur":
             self.player.pause()
             self.button1.setText("Devam Et")
+            self.acik = False
+            self.updateRPC()
         else:
             self.player.play()
             self.button1.setText("Durdur")
+            self.acik = True
+            self.updateRPC()
 
     def gerial(self):
         if self.player.position() < 5000:
@@ -141,6 +174,6 @@ class Window(QWidget):
             self.player.setPosition(self.player.position()+5000)
 
 if __name__ == '__main__':
-    app = QApplication(sys.argv)
+    app = QApplication(argv)
     pencere = Window()
-    sys.exit(app.exec_())
+    exit(app.exec_())
